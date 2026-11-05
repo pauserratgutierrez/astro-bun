@@ -68,6 +68,23 @@ describe("rendering", () => {
     expect(body).not.toMatch(/\bat \S+:\d+/);
   });
 
+  test("transforms an image with Sharp through the image endpoint", async () => {
+    const html = await (await fetch(`${server.origin}/image`)).text();
+    const src = /<img[^>]+src="([^"]+)"/
+      .exec(html)?.[1]
+      ?.replaceAll("&#38;", "&")
+      .replaceAll("&amp;", "&");
+    expect(src).toStartWith("/_image?");
+    const response = await fetch(`${server.origin}${src}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/webp");
+    // The PNG came back as WebP: Sharp ran on Bun.
+    const bytes = await response.bytes();
+    const ascii = (start: number, end: number) =>
+      String.fromCharCode(...bytes.subarray(start, end));
+    expect([ascii(0, 4), ascii(8, 12)]).toEqual(["RIFF", "WEBP"]);
+  });
+
   test("answers an unknown path with the prerendered 404 page", async () => {
     const response = await fetch(`${server.origin}/nowhere`);
     expect(response.status).toBe(404);
