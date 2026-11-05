@@ -24,19 +24,17 @@
 
 ## Releasing
 
-A release is a GitHub release whose tag is `v` and the version in `package.json`, such as `v0.1.0`. Publishing it runs [release.yml](../.github/workflows/release.yml): the checks and tests on Linux, then `npm publish --provenance` through npm's trusted publishing, with no token stored. A version already on npm is left as it is, so a workflow run can be repeated.
+Releases follow scraply and sluice: pushing a version tag publishes it. `package.json` keeps `0.0.0` in git, and [release.yml](../.github/workflows/release.yml) takes the version from the tag (`v0.2.0` publishes 0.2.0) once the checks and tests pass on Linux, then publishes through npm's trusted publishing, with provenance and no token stored. A version already on npm is left as it is, so a tag can be pushed again.
 
-1. Raise `version` in `package.json` in a pull request, and merge it.
-2. Create the release from `main`, tagged `v<version>`, with its notes.
+1. Add the version's entry to [CHANGELOG.md](../CHANGELOG.md), with anything that changes behavior for an app called out: in the pull request that makes the change, or in one of its own.
+2. Once it is merged, tag `main`: `git tag v0.2.0 && git push origin v0.2.0`.
 
-npm lets a package trust a workflow only once the package exists, so the first version (0.1.0) was published by hand, once, from an up-to-date `main`:
+npm lets a package trust a workflow only once the package exists, so 0.1.0 was published by hand, once:
 
 1. `npm login` as the package's owner.
-2. `npm publish --access public --provenance=false`: `prepublishOnly` builds the package first, and provenance is signed only in CI.
-3. On npmjs.com, the package's **Settings**, **Trusted publishing**: GitHub Actions, repository `pauserratgutierrez/astro-bun`, workflow `release.yml`.
-4. The GitHub release `v0.1.0`, for its notes: its workflow run finds 0.1.0 on npm and publishes nothing.
-
-From then on every version comes from a release.
+2. `npm publish --access public --provenance=false`, with `package.json` at 0.1.0: `prepublishOnly` builds the package first, and provenance is signed only in CI.
+3. On npmjs.com, the package's **Settings**, **Trusted Publisher**: GitHub Actions, `pauserratgutierrez` / `astro-bun`, workflow `release.yml`, **Allow npm publish**. The connection names the workflow's file, so renaming it means setting this up again.
+4. **Publishing access**: two-factor authentication, with no tokens that bypass it.
 
 ## Tests
 

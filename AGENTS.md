@@ -30,5 +30,5 @@ This repository is an Astro adapter for Bun, published to npm as `@pauserratguti
 - Leave no dead code: delete what you introduce and what your change orphans (imports, exports, helpers, types, options, docs).
 - A behavior change updates [README.md](./README.md) and [docs/](./docs/) in the same change.
 - Every package in `package.json` is an exact version, never `^` or `~` (`bun add -E`), except the `astro` peer range.
-- Markdown names: `README.md` is a folder's page and `AGENTS.md` this file; every other page is lowercase kebab-case in `docs/`. A link uses its target's exact case: Linux and GitHub are case-sensitive, and Windows hides a wrong one.
+- Markdown names: `README.md` is a folder's page, `AGENTS.md` this file, and `CHANGELOG.md` the versions; every other page is lowercase kebab-case in `docs/`. A link uses its target's exact case: Linux and GitHub are case-sensitive, and Windows hides a wrong one.
 - Do not wrap prose, comments, or YAML at a column width.
