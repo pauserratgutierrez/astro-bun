@@ -1,0 +1,5 @@
+---
+await new Promise((resolve) => setTimeout(resolve, 30));
+throw new Error("upstream failed after the head was sent");
+---
+<p>never</p>

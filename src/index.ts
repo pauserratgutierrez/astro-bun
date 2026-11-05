@@ -66,6 +66,7 @@ export default function bun(options: Options = {}): AstroIntegration {
           supportedAstroFeatures: {
             serverOutput: "stable",
             envGetSecret: "stable",
+            sharpImageService: "stable",
           },
         });
       },

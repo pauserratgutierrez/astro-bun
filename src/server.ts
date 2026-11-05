@@ -70,6 +70,7 @@ export async function handler(
     // An event stream may stay quiet longer than the idle timeout.
     if (response.headers.get("content-type")?.startsWith("text/event-stream"))
       server.timeout(request, 0);
+    // The body goes to Bun untouched: reading `response.body` turns Astro's async iterable into a ReadableStream and costs a streamed page about 16% of its throughput (more with any wrapper).
     return response;
   } catch (error) {
     // A client that left is not an error.
