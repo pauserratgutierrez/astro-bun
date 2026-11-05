@@ -14,6 +14,7 @@ declare module "virtual:astro-bun:config" {
     /** Bytes of static files, compressed copies included, kept in memory. */
     staticMemoryBudget: number;
     streaming: boolean;
+    preload: boolean;
   };
   export default config;
 }

@@ -38,7 +38,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.build.json && bun test"
+    "test": "tsc -p tsconfig.build.json && bun test",
+    "test:linux": "docker build -q -f test/Dockerfile -t astro-bun-test . && docker run --rm astro-bun-test"
   },
   "peerDependencies": {
     "astro": "^7.4.0"

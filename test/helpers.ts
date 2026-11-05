@@ -25,23 +25,31 @@ export async function build(fixture: string): Promise<string> {
   return root;
 }
 
-export interface Running {
+export interface Launched {
+  /** Everything the server wrote so far, stdout and stderr. */
+  log(): string;
+  /** Sends the process a signal. */
+  signal(name: NodeJS.Signals): void;
+  /** Its exit code, once it exits. */
+  exited: Promise<number>;
+}
+
+export interface Running extends Launched {
   /** The server's origin, `http://127.0.0.1:<port>`. */
   origin: string;
   port: number;
-  /** Everything the server wrote so far, stdout and stderr. */
-  log(): string;
   stop(): Promise<void>;
 }
 
-/** Starts a built fixture's server on Bun, on a port the system picks, and waits until it listens. */
-export async function start(
+/** Runs a built fixture's server on Bun, in the fixture's directory, on a port the system picks unless `env` names one. */
+export function launch(
   root: string,
   env: Record<string, string> = {},
-): Promise<Running> {
+): Launched {
   const child = Bun.spawn(
     [process.execPath, "--no-env-file", `${root}dist/server/entry.mjs`],
     {
+      cwd: root,
       env: { ...process.env, HOST: "127.0.0.1", PORT: "0", ...env },
       stdout: "pipe",
       stderr: "pipe",
@@ -55,24 +63,53 @@ export async function start(
   };
   void drain(child.stdout);
   void drain(child.stderr);
+  return {
+    log: () => log,
+    signal: (name) => child.kill(name),
+    exited: child.exited,
+  };
+}
+
+/** Starts a built fixture's server and waits until it listens. */
+export async function start(
+  root: string,
+  env: Record<string, string> = {},
+): Promise<Running> {
+  const launched = launch(root, env);
+  let exited = false;
+  void launched.exited.then(() => (exited = true));
   const deadline = Date.now() + 15_000;
   let port: number | undefined;
   while (port === undefined) {
-    const match = /listening on http:\/\/127\.0\.0\.1:(\d+)/.exec(log);
+    const match = /listening on http:\/\/127\.0\.0\.1:(\d+)/.exec(
+      launched.log(),
+    );
     if (match) port = Number(match[1]);
-    else if (child.exitCode !== null || Date.now() > deadline)
-      throw new Error(`the server did not start\n${log}`);
+    else if (exited || Date.now() > deadline)
+      throw new Error(`the server did not start\n${launched.log()}`);
     else await Bun.sleep(25);
   }
   return {
+    ...launched,
     origin: `http://127.0.0.1:${port}`,
     port,
-    log: () => log,
     async stop() {
-      child.kill("SIGTERM");
-      await child.exited;
+      launched.signal("SIGTERM");
+      await launched.exited;
     },
   };
+}
+
+/** Waits until `ready` holds, or fails after `ms`. */
+export async function until(
+  ready: () => boolean | Promise<boolean>,
+  ms = 3000,
+): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (!(await ready())) {
+    if (Date.now() > deadline) throw new Error("timed out");
+    await Bun.sleep(25);
+  }
 }
 
 /** Sends request bytes as written, for headers `fetch` refuses, and returns the whole answer. */
