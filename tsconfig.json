@@ -11,5 +11,7 @@
     "skipLibCheck": true,
     "types": ["bun"]
   },
-  "include": ["src", "test"]
+  "include": ["src", "test"],
+  // Each fixture is an Astro project, typed by its own build.
+  "exclude": ["test/fixtures"]
 }

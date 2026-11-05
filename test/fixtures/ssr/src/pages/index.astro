@@ -1,0 +1,12 @@
+---
+// Resolves after the head has streamed.
+const later = new Promise((resolve) => setTimeout(() => resolve("streamed part"), 50));
+---
+
+<html lang="en">
+  <head><title>ssr fixture</title></head>
+  <body>
+    <h1>Rendered on Bun</h1>
+    <p>{later}</p>
+  </body>
+</html>
