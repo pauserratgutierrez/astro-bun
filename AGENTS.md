@@ -5,7 +5,7 @@ This repository is an Astro adapter for Bun, published to npm as `@pauserratguti
 ## Hard stops
 
 - Never trust the `Host` header unless it matches `security.allowedDomains`; otherwise the request URL is `localhost:<port>`, as in Astro's Node adapter.
-- Never serve a file that is not in the static manifest the build writes. No path from a request reaches the filesystem.
+- Never serve a file outside the client directory as listed at startup. No path from a request reaches the filesystem.
 - Never run `Bun.serve` with `development` on, and never send a stack trace or an internal path to a client.
 - Build-time code (`src/index.ts` and what it imports) runs in the Astro CLI on Node or Bun: `node:*` and Astro APIs only, never `Bun.*`. Runtime code runs only on Bun.
 - Use Astro's public API: `astro/app/entrypoint`, `astro/env/setup`, the `App` methods, the integration hooks. An internal one is feature-detected, has a fallback, and is listed in [docs/design.md](./docs/design.md#astro-internals-used).

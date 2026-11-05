@@ -98,11 +98,15 @@ function forwardedHost(
   return `${host.split(":", 1)[0]}:${port}`;
 }
 
-/** The same request at another origin. Its path is taken from `request.url` as Bun built it: a full URL, or a bare path when Host was unusable. */
-function onLocalhost(request: Request, origin: string): Request {
-  const { url } = request;
+/** The path and query of `request.url` as Bun built it: a full URL, or a bare path when Host was unusable. */
+export function pathAndQuery(url: string): string {
   const at = url.startsWith("/") ? 0 : url.indexOf("/", url.indexOf("//") + 2);
-  return new Request(origin + (at === -1 ? "/" : url.slice(at)), {
+  return at === -1 ? "/" : url.slice(at);
+}
+
+/** The same request at another origin. */
+function onLocalhost(request: Request, origin: string): Request {
+  return new Request(origin + pathAndQuery(request.url), {
     method: request.method,
     headers: request.headers,
     body: request.body,

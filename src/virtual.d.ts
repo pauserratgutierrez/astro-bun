@@ -11,6 +11,8 @@ declare module "virtual:astro-bun:config" {
     /** Absent for Bun's default. */
     maxRequestBodySize?: number;
     shutdownTimeout: number;
+    /** Bytes of static files, compressed copies included, kept in memory. */
+    staticMemoryBudget: number;
     streaming: boolean;
   };
   export default config;

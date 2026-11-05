@@ -3,8 +3,19 @@ import { fileURLToPath } from "node:url";
 import type { AstroConfig, AstroIntegration } from "astro";
 import type runtimeConfig from "virtual:astro-bun:config";
 import type { Plugin } from "vite";
+import { writeStaticManifest } from "./build/static.js";
 
 export interface Options {
+  /**
+   * Whether the build writes Brotli, zstd, and gzip copies of text files, at their highest levels, for the server to send to the clients that accept them.
+   * @default true
+   */
+  precompress?: boolean;
+  /**
+   * Bytes of static files, compressed copies included, the server keeps in memory, smallest files first. The rest is read from disk on each request.
+   * @default 64 MiB
+   */
+  staticMemoryBudget?: number;
   /**
    * Seconds a connection may go without a byte either way before Bun closes it, from 0 (never) to 255. Bun's own default, 10, also resets a render slower than that to its first byte. Event streams are exempt.
    * @default 60
@@ -54,6 +65,10 @@ export default function bun(options: Options = {}): AstroIntegration {
             },
           },
           vite: { plugins: [configPlugin(() => runtime(config, options))] },
+          // Astro puts the adapter first, and an integration added here last: its build:done sees the files every other integration writes then.
+          integrations: [
+            staticFiles(() => config, options.precompress ?? true),
+          ],
         });
       },
       "astro:config:done": ({ config: resolved, setAdapter }) => {
@@ -65,10 +80,37 @@ export default function bun(options: Options = {}): AstroIntegration {
           adapterFeatures: { buildOutput: "server", middlewareMode: "classic" },
           supportedAstroFeatures: {
             serverOutput: "stable",
+            hybridOutput: "stable",
+            staticOutput: "stable",
             envGetSecret: "stable",
             sharpImageService: "stable",
           },
         });
+      },
+    },
+  };
+}
+
+/** Lists, hashes, and compresses the client files once the build has written them all. */
+function staticFiles(
+  config: () => AstroConfig,
+  precompress: boolean,
+): AstroIntegration {
+  return {
+    name: `${NAME}/static-files`,
+    hooks: {
+      "astro:build:done": async ({ dir, logger }) => {
+        const { files } = await writeStaticManifest({
+          client: dir,
+          server: config().build.server,
+          assets: config().build.assets,
+          precompress,
+        });
+        const copies = files.reduce(
+          (sum, file) => sum + Object.keys(file.encodings).length,
+          0,
+        );
+        logger.info(`${files.length} files, ${copies} compressed copies`);
       },
     },
   };
@@ -83,6 +125,7 @@ function runtime(config: AstroConfig, options: Options): typeof runtimeConfig {
     idleTimeout: options.idleTimeout ?? 60,
     maxRequestBodySize: options.maxRequestBodySize,
     shutdownTimeout: options.shutdownTimeout ?? 8000,
+    staticMemoryBudget: options.staticMemoryBudget ?? 64 * 1024 * 1024,
     streaming: options.streaming ?? true,
   };
 }

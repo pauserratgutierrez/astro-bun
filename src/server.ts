@@ -1,10 +1,12 @@
 // The server entrypoint: Astro bundles it into dist/server/entry.mjs, whose top-level code starts the server.
 // ASTRO_BUN_AUTOSTART=disabled leaves the start to an app that imports `handler` into its own Bun.serve.
+import { fileURLToPath } from "node:url";
 import type { Server } from "bun";
 import { createApp } from "astro/app/entrypoint";
 import { setGetEnv } from "astro/env/setup";
 import config from "virtual:astro-bun:config";
-import { forAstro } from "./request.js";
+import { forAstro, pathAndQuery } from "./request.js";
+import { loadStatic } from "./static.js";
 
 setGetEnv((key) => process.env[key]);
 
@@ -13,8 +15,24 @@ const app = createApp({ streaming: config.streaming });
 await app.getLogger();
 const logger = app.adapterLogger;
 const domains = app.getAllowedDomains() ?? [];
-// This module's own URL: the entry file in the server directory.
-const client = new URL(config.client, import.meta.url);
+// This module is the entry file in the server directory, and the client directory is where the build left it from there.
+const statics = await loadStatic(
+  fileURLToPath(new URL(config.client, import.meta.url)),
+  fileURLToPath(new URL("./", import.meta.url)),
+  config.staticMemoryBudget,
+  {
+    base: app.manifest.base,
+    trailingSlash: app.manifest.trailingSlash,
+    format: app.manifest.buildFormat,
+    assets: app.manifest.assetsDir,
+  },
+);
+if (statics.unlisted > 0)
+  logger.info(
+    `Static files written after the build listed them, sent uncompressed: ${statics.unlisted}`,
+  );
+/** The static files' routes, for an app that runs its own `Bun.serve`. */
+export const routes = statics.routes;
 
 /** Background work a render hands over, such as a cache provider's write: a shutdown waits for it. */
 const pending = new Set<Promise<unknown>>();
@@ -32,26 +50,26 @@ function waitUntil(promise: Promise<unknown>): void {
 
 const ERROR_PAGE = /\/(404|500)(?:\.html|\/index\.html)$/;
 
-/** A prerendered 404 or 500 page, read from the client directory: Astro would otherwise fetch it over HTTP from the server itself. */
+/** A prerendered 404 or 500 page from the static files: Astro would otherwise fetch it over HTTP from the server itself. */
 async function prerenderedErrorPage(url: string): Promise<Response> {
-  const status = ERROR_PAGE.exec(new URL(url).pathname)?.[1];
-  for (const name of status === undefined
-    ? []
-    : [`${status}.html`, `${status}/index.html`]) {
-    const file = Bun.file(new URL(name, client));
-    if (await file.exists())
-      return new Response(file, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
-  }
-  return new Response(null, { status: 404 });
+  const status = ERROR_PAGE.exec(new URL(url).pathname)?.[1] as
+    "404" | "500" | undefined;
+  return (
+    (status && statics.errorPage(status)) || new Response(null, { status: 404 })
+  );
 }
 
-/** Renders a request with Astro. */
+/** Answers what the static routes did not: a static file whose path came percent-encoded another way, else Astro. */
 export async function handler(
   request: Request,
   server: Server<unknown>,
 ): Promise<Response> {
+  if (request.method === "GET" || request.method === "HEAD") {
+    const target = pathAndQuery(request.url);
+    const query = target.indexOf("?");
+    const file = statics.find(query === -1 ? target : target.slice(0, query));
+    if (file !== undefined) return file(request);
+  }
   const astroRequest = forAstro(request, server, domains);
   try {
     let routeData = app.match(astroRequest, true);
@@ -118,6 +136,7 @@ function start(): void {
       ...(config.maxRequestBodySize === undefined
         ? {}
         : { maxRequestBodySize: config.maxRequestBodySize }),
+      routes: statics.routes,
       fetch: handler,
       error(error) {
         logger.error(describe(error));
