@@ -22,6 +22,21 @@
 
 `bun run test:linux` builds [test/Dockerfile](../test/Dockerfile) (Node's image with Bun's binary, dependencies installed for Linux) and runs the suite in it. Tests of signals skip on Windows, where a kill ends a process without running its handlers; they run on Linux and macOS.
 
+## Releasing
+
+A release is a GitHub release whose tag is `v` and the version in `package.json`, such as `v0.1.0`. Publishing it runs [release.yml](../.github/workflows/release.yml): the checks and tests on Linux, then `npm publish --provenance` through npm's trusted publishing, with no token stored.
+
+1. Raise `version` in `package.json` in a pull request, and merge it.
+2. Create the release from `main`, tagged `v<version>`, with its notes.
+
+npm lets a package trust a workflow only once the package exists, so the first version is published by hand, once:
+
+1. `npm login` as the package's owner.
+2. `bun run build`, then `npm publish --access public --provenance=false` (provenance is signed only in CI).
+3. On npmjs.com, the package's **Settings**, **Trusted publishing**: GitHub Actions, repository `pauserratgutierrez/astro-bun`, workflow `release.yml`.
+
+From then on every version comes from a release.
+
 ## Tests
 
 - `test/fixtures/<name>/` is an Astro project whose config imports the adapter from `dist/`.
