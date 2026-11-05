@@ -96,6 +96,10 @@ export default function bun(options: Options = {}): AstroIntegration {
           name: NAME,
           entrypointResolution: "auto",
           serverEntrypoint: new URL("./server.js", import.meta.url),
+          // A path: Astro resolves it with require.resolve, which takes no file URL.
+          previewEntrypoint: fileURLToPath(
+            new URL("./preview.js", import.meta.url),
+          ),
           adapterFeatures: { buildOutput: "server", middlewareMode: "classic" },
           supportedAstroFeatures: {
             serverOutput: "stable",

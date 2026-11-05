@@ -1,7 +1,7 @@
 import { connect } from "node:net";
 import { fileURLToPath } from "node:url";
 
-const astro = fileURLToPath(
+export const astro = fileURLToPath(
   new URL("../node_modules/astro/bin/astro.mjs", import.meta.url),
 );
 
@@ -41,13 +41,22 @@ export interface Running extends Launched {
   stop(): Promise<void>;
 }
 
-/** Runs a built fixture's server on Bun, in the fixture's directory, on a port the system picks unless `env` names one. */
+/**
+ * Runs a built fixture's server on Bun, in the fixture's directory, on a port the system picks unless `env` names one.
+ * With `script`, Bun runs that file and passes it the entry's path, as an app with its own `Bun.serve` would load it.
+ */
 export function launch(
   root: string,
   env: Record<string, string> = {},
+  script?: string,
 ): Launched {
+  const entry = `${root}dist/server/entry.mjs`;
   const child = Bun.spawn(
-    [process.execPath, "--no-env-file", `${root}dist/server/entry.mjs`],
+    [
+      process.execPath,
+      "--no-env-file",
+      ...(script ? [script, entry] : [entry]),
+    ],
     {
       cwd: root,
       env: { ...process.env, HOST: "127.0.0.1", PORT: "0", ...env },
@@ -74,8 +83,9 @@ export function launch(
 export async function start(
   root: string,
   env: Record<string, string> = {},
+  script?: string,
 ): Promise<Running> {
-  const launched = launch(root, env);
+  const launched = launch(root, env, script);
   let exited = false;
   void launched.exited.then(() => (exited = true));
   const deadline = Date.now() + 15_000;

@@ -1,8 +1,112 @@
 # astro-bun
 
-An [Astro](https://astro.build) adapter that serves on-demand rendered pages with [Bun](https://bun.com)'s native HTTP server, `Bun.serve`.
+An [Astro](https://astro.build) adapter that serves on-demand rendered pages with [Bun](https://bun.com)'s native HTTP server, `Bun.serve`, and the static files beside them from memory, precompressed.
 
-> **Status:** in development, not published yet. What it does and how is in [docs/design.md](./docs/design.md).
+> **Status:** not on npm yet; the first release publishes it. How it works: [docs/design.md](./docs/design.md).
+
+## Install
+
+```sh
+bun add @pauserratgutierrez/astro-bun
+```
+
+```js
+// astro.config.mjs
+import bun from "@pauserratgutierrez/astro-bun";
+import { defineConfig } from "astro/config";
+
+export default defineConfig({
+  output: "server",
+  adapter: bun(),
+});
+```
+
+Build with the Astro CLI as usual, on Node (which Astro supports) or Bun, then run the server on Bun:
+
+```sh
+astro build
+bun --no-env-file ./dist/server/entry.mjs
+```
+
+The server listens on `HOST` and `PORT`, or on Astro's `server.host` and `server.port` (`localhost:4321`). `--no-env-file` keeps Bun from loading the `.env` files of the working directory, which it does on its own. `astro preview` runs the same server on Bun, even when the Astro CLI runs on Node.
+
+## What it does
+
+- **Every Astro feature.** Routing, middleware, actions, server islands, sessions, i18n, redirects, rewrites, cookies, CSP, and `src/fetch.ts` run inside Astro's `app.render()`: the adapter hands it each request and sends back its `Response`, with no `node:http` layer.
+- **Static files from memory.** At build time every client file is hashed, and text files get Brotli, zstd, and gzip copies at their highest levels. The server sends the smallest copy each client accepts, with ETags and 304s, `immutable` caching for `/_astro/`, and HEAD; the smallest files are kept in memory (64 MiB by default), the rest read from disk. Prerendered pages answer at their clean URLs, following `base`, `trailingSlash`, and `build.format`. Files other integrations write after the build (a sitemap, a search index, icons) are listed and compressed too.
+- **Secure defaults.** The request URL is kept only for a `Host` listed in `security.allowedDomains`, as in Astro's Node adapter; `X-Forwarded-For` is trusted only behind such a host. No request path reaches the filesystem, dotfiles are not served (except `.well-known`), Bun's development error page is always off, and prerendered 404 and 500 pages are read locally.
+- **A production lifecycle.** `SIGTERM` lets the responses in flight finish (within `shutdownTimeout`), then exits. Event streams outlive the idle timeout, which defaults to 60 s rather than Bun's 10. Bodies over `maxRequestBodySize` get 413. A port in use exits 1. An unhandled rejection is logged, not fatal. Every page module loads before the server listens.
+- **Sessions and images.** Sessions work with no driver configured, on files under the working directory. `astro:assets` transforms images with Sharp on Bun.
+- **No runtime dependencies.**
+
+## Options
+
+```js
+bun({
+  idleTimeout: 60, // seconds without a byte before Bun closes a connection; Bun counts them in 4-second steps
+  maxRequestBodySize: 128 * 1024 * 1024, // bytes; larger bodies get 413 before the app runs
+  shutdownTimeout: 8000, // milliseconds SIGTERM waits for the responses in flight
+  streaming: true, // send pages as they render
+  preload: true, // load every page module at startup
+  precompress: true, // write Brotli, zstd, and gzip copies of text files at build time
+  staticMemoryBudget: 64 * 1024 * 1024, // bytes of static files kept in memory, smallest first
+});
+```
+
+## Behind a reverse proxy
+
+List the public host so Astro builds its URLs, its CSRF check, and `Astro.clientAddress` from what the proxy forwards:
+
+```js
+export default defineConfig({
+  security: {
+    allowedDomains: [{ hostname: "example.com", protocol: "https" }],
+  },
+});
+```
+
+The proxy sends `Host` (or `X-Forwarded-Host`) and `X-Forwarded-Proto`. Without a match the request URL is `http://localhost:<port>`, and the client address is the socket's.
+
+## In a container
+
+```dockerfile
+FROM node:26.13.0-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build && npm prune --omit=dev
+
+FROM oven/bun:1.4.4-slim
+WORKDIR /app
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+ENV HOST=0.0.0.0 PORT=4321
+USER bun
+EXPOSE 4321
+CMD ["bun", "--no-env-file", "./dist/server/entry.mjs"]
+```
+
+Bun handles `SIGTERM` itself as PID 1. A read-only container needs a session driver of its own if the app uses sessions.
+
+## Your own Bun.serve
+
+With `ASTRO_BUN_AUTOSTART=disabled`, the built entry starts nothing and exports what the server is made of, for an app that adds routes or WebSockets of its own:
+
+```js
+process.env.ASTRO_BUN_AUTOSTART = "disabled";
+const { handler, routes } = await import("./dist/server/entry.mjs");
+
+Bun.serve({
+  routes: { ...routes, "/health": new Response("ok") },
+  fetch(request, server) {
+    if (new URL(request.url).pathname === "/socket" && server.upgrade(request))
+      return;
+    return handler(request, server);
+  },
+  websocket: { message: (socket, message) => socket.send(message) },
+});
+```
 
 ## Why this exists
 
@@ -30,16 +134,6 @@ Astro has no official Bun adapter, and its team has said it does not plan Bun-sp
 - `astro preview` fails when the Astro CLI runs on Node, its default runtime.
 - Build hooks that call Bun-only APIs, which forces the whole Astro CLI to run under Bun, a setup Astro does not support.
 - Redirects from the config, and directory indexes of prerendered pages, answered 404.
-
-## Goals
-
-- `Bun.serve` directly, with no `node:http` layer: Astro and Bun both speak `Request` and `Response`.
-- Every Astro feature from the start. Routing, middleware, actions, server islands, sessions, and the rest run inside Astro's `app.render()`; the adapter covers only what Astro hands to it: static files, the client address, host validation, the environment, error pages, and the server's lifecycle.
-- Static files listed and precompressed (Brotli, zstd, gzip) at build time and served from memory: no filesystem access per request, and no path outside the build's list can be served.
-- Secure defaults that match Astro's Node adapter: the host validated against `security.allowedDomains`, prerendered error pages read locally, Bun's development mode always off.
-- A production lifecycle: graceful shutdown on `SIGTERM`, timeouts that suit streaming, a request body limit.
-- `astro dev` and `astro build` stay on Node, which Astro supports; only the production server runs on Bun.
-- No runtime dependencies.
 
 ## Requirements
 
