@@ -15,6 +15,13 @@ const app = createApp({ streaming: config.streaming });
 await app.getLogger();
 const logger = app.adapterLogger;
 const domains = app.getAllowedDomains() ?? [];
+// Every page module now rather than on its first request: no request waits for an import, and none runs under a request's AsyncLocalStorage, whose store Bun can lose during a dynamic import (oven-sh/bun#32693). A page that fails to load is logged; its requests fail as they would have.
+if (config.preload)
+  for (const result of await Promise.allSettled(
+    [...(app.manifest.pageMap?.values() ?? [])].map((load) => load()),
+  ))
+    if (result.status === "rejected")
+      logger.error(`Could not load a page\n${describe(result.reason)}`);
 // This module is the entry file in the server directory, and the client directory is where the build left it from there.
 const statics = await loadStatic(
   fileURLToPath(new URL(config.client, import.meta.url)),

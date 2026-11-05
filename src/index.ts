@@ -1,6 +1,7 @@
 import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AstroConfig, AstroIntegration } from "astro";
+import { sessionDrivers } from "astro/config";
 import type runtimeConfig from "virtual:astro-bun:config";
 import type { Plugin } from "vite";
 import { writeStaticManifest } from "./build/static.js";
@@ -36,7 +37,15 @@ export interface Options {
    * @default true
    */
   streaming?: boolean;
+  /**
+   * Whether the server loads every page's module at startup, so no page waits for it on its first request.
+   * @default true
+   */
+  preload?: boolean;
 }
+
+/** Where sessions are kept when the config names no driver: relative, so the server resolves it in its working directory, not on the build machine. */
+const SESSIONS_DIR = "node_modules/.astro/sessions";
 
 const NAME = "@pauserratgutierrez/astro-bun";
 const CONFIG_ID = "virtual:astro-bun:config";
@@ -50,7 +59,17 @@ export default function bun(options: Options = {}): AstroIntegration {
     name: NAME,
     hooks: {
       "astro:config:setup": ({ config: initial, command, updateConfig }) => {
+        const { session } = initial;
         updateConfig({
+          // Sessions work with no driver configured, on files, as with Astro's Node adapter; `session: false` keeps them off.
+          ...(session !== false && !session?.driver
+            ? {
+                session: {
+                  ...session,
+                  driver: sessionDrivers.fsLite({ base: SESSIONS_DIR }),
+                },
+              }
+            : {}),
           // A redirect stays a route the server answers, not an HTML file with a meta refresh.
           build: { redirects: false },
           // The endpoint that reads local images from disk, not the generic one that fetches them from the server itself.
@@ -126,6 +145,7 @@ function runtime(config: AstroConfig, options: Options): typeof runtimeConfig {
     maxRequestBodySize: options.maxRequestBodySize,
     shutdownTimeout: options.shutdownTimeout ?? 8000,
     staticMemoryBudget: options.staticMemoryBudget ?? 64 * 1024 * 1024,
+    preload: options.preload ?? true,
     streaming: options.streaming ?? true,
   };
 }
