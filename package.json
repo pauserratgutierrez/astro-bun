@@ -38,7 +38,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json",
-    "test": "bun test"
+    "test": "tsc -p tsconfig.build.json && bun test"
   },
   "peerDependencies": {
     "astro": "^7.4.0"
