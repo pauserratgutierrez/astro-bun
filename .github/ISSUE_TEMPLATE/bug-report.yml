@@ -1,0 +1,30 @@
+name: Bug report
+description: Something the adapter does wrong.
+labels: [bug]
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: The adapter, Astro, and Bun, and the Node that runs `astro build`.
+      placeholder: "@pauserratgutierrez/astro-bun 0.1.0, astro 7.4.5, bun 1.4.4, node 26.13.0"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: A repository, or the smallest `astro.config.mjs` and page that show it, with the request that fails (a `curl` line is ideal).
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Linux (Docker oven/bun:1.4.4-slim), macOS 16, Windows 11

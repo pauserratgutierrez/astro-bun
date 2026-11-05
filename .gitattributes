@@ -1,0 +1,16 @@
+# LF everywhere, whatever core.autocrlf says: the adapter runs in Linux containers, and CRLF drift shows as whole-file diffs.
+* text=auto eol=lf
+
+# Binary fixtures and precompressed files: no line-ending conversion, no text diffs. SVG stays text.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.avif  binary
+*.ico   binary
+*.woff2 binary
+*.woff  binary
+*.br    binary
+*.gz    binary
+*.zst   binary

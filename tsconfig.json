@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ESNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["bun"]
+  },
+  "include": ["src", "test"]
+}

@@ -1,0 +1,55 @@
+{
+  "name": "@pauserratgutierrez/astro-bun",
+  "version": "0.0.0",
+  "description": "Astro adapter for Bun: on-demand rendering on Bun.serve, with static files precompressed at build time and served from memory.",
+  "license": "MIT",
+  "author": {
+    "name": "Pau Serrat Gutiérrez",
+    "url": "https://github.com/pauserratgutierrez"
+  },
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pauserratgutierrez/astro-bun.git"
+  },
+  "bugs": "https://github.com/pauserratgutierrez/astro-bun/issues",
+  "homepage": "https://github.com/pauserratgutierrez/astro-bun#readme",
+  "keywords": [
+    "withastro",
+    "astro-adapter",
+    "astro-integration",
+    "astro",
+    "bun",
+    "ssr"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "bun": ">=1.4.4"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc -p tsconfig.json",
+    "test": "bun test"
+  },
+  "peerDependencies": {
+    "astro": "^7.4.0"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "astro": "7.4.5",
+    "typescript": "7.0.2"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+
+node_modules/
+# Build output: the package's and each fixture's.
+dist/
+.astro/
+*.tgz
