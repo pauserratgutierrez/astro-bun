@@ -54,5 +54,12 @@ jobs:
       - name: Test
         run: bun run test
 
-      - name: Publish
-        run: npm publish --provenance --access public
+      # A version already on npm (the first, published by hand: docs/development.md#releasing) is left as it is.
+      - name: Publish, unless this version is on npm already
+        run: |
+          package="$(node -p 'require("./package.json").name')@$(node -p 'require("./package.json").version')"
+          if npm view "$package" version > /dev/null 2>&1; then
+            echo "$package is on npm already"
+          else
+            npm publish --provenance --access public
+          fi
