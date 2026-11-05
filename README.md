@@ -2,7 +2,7 @@
 
 An [Astro](https://astro.build) adapter that serves on-demand rendered pages with [Bun](https://bun.com)'s native HTTP server, `Bun.serve`, and the static files beside them from memory, precompressed.
 
-> **Status:** not on npm yet; the first release publishes it. How it works: [docs/design.md](./docs/design.md).
+> **Status:** early (0.x): an option may change between minor versions. How it works: [docs/design.md](./docs/design.md).
 
 ## Install
 

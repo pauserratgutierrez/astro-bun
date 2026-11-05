@@ -24,16 +24,17 @@
 
 ## Releasing
 
-A release is a GitHub release whose tag is `v` and the version in `package.json`, such as `v0.1.0`. Publishing it runs [release.yml](../.github/workflows/release.yml): the checks and tests on Linux, then `npm publish --provenance` through npm's trusted publishing, with no token stored.
+A release is a GitHub release whose tag is `v` and the version in `package.json`, such as `v0.1.0`. Publishing it runs [release.yml](../.github/workflows/release.yml): the checks and tests on Linux, then `npm publish --provenance` through npm's trusted publishing, with no token stored. A version already on npm is left as it is, so a workflow run can be repeated.
 
 1. Raise `version` in `package.json` in a pull request, and merge it.
 2. Create the release from `main`, tagged `v<version>`, with its notes.
 
-npm lets a package trust a workflow only once the package exists, so the first version is published by hand, once:
+npm lets a package trust a workflow only once the package exists, so the first version (0.1.0) was published by hand, once, from an up-to-date `main`:
 
 1. `npm login` as the package's owner.
-2. `bun run build`, then `npm publish --access public --provenance=false` (provenance is signed only in CI).
+2. `npm publish --access public --provenance=false`: `prepublishOnly` builds the package first, and provenance is signed only in CI.
 3. On npmjs.com, the package's **Settings**, **Trusted publishing**: GitHub Actions, repository `pauserratgutierrez/astro-bun`, workflow `release.yml`.
+4. The GitHub release `v0.1.0`, for its notes: its workflow run finds 0.1.0 on npm and publishes nothing.
 
 From then on every version comes from a release.
 

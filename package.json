@@ -1,6 +1,6 @@
 {
   "name": "@pauserratgutierrez/astro-bun",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Astro adapter for Bun: on-demand rendering on Bun.serve, with static files precompressed at build time and served from memory.",
   "license": "MIT",
   "author": {
@@ -39,6 +39,7 @@
     "build": "bun -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json",
     "check": "tsc -p tsconfig.json",
     "test": "bun run build && bun test",
+    "prepublishOnly": "bun run build",
     "test:linux": "docker build -q -f test/Dockerfile -t astro-bun-test . && docker run --rm astro-bun-test"
   },
   "peerDependencies": {
