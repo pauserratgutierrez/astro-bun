@@ -3,6 +3,7 @@
 ## 0.2.0
 
 - Requires Astro 7.4.11 or later.
+- A page that fails after it started streaming is logged once through the configured logger (withastro/astro#18625, fixed in Astro). The adapter needed no change; a test now covers it.
 
 ## 0.1.1
 
