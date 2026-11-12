@@ -12,6 +12,6 @@
     "types": ["bun"]
   },
   "include": ["src", "test"],
-  // Each fixture is an Astro project, typed by its own build.
+  // Each fixture is an Astro project, which `astro build` compiles without checking its types: nothing typechecks the fixtures.
   "exclude": ["test/fixtures"]
 }
