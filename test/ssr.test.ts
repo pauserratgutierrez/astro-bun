@@ -108,13 +108,14 @@ describe("host and client address", () => {
     );
   });
 
-  test("puts a host Bun cannot build a URL from on localhost, keeping the path and query", async () => {
+  test("puts a host that is not a plain hostname and port on localhost, keeping the path and query", async () => {
     for (const host of [
       "evil.example/x",
       "user@app.example",
       "app.example\\x",
       "app.example:99999",
       "a:1:2",
+      "plain%2Eexample",
     ]) {
       const answer = await raw(
         server.port,
@@ -167,6 +168,39 @@ describe("host and client address", () => {
     });
     expect(body.url).toBe(`http://localhost:${server.port}/info`);
     expect(body.clientAddress).toBe("127.0.0.1");
+  });
+
+  test("matches protocol, host, and port together, as Astro's Node adapter does", async () => {
+    const forwardedFor = { "X-Forwarded-For": "203.0.113.7" };
+    // An entry's port 443 matches a host without a port under https.
+    expect(
+      await info({
+        Host: "port.example",
+        "X-Forwarded-Proto": "https",
+        ...forwardedFor,
+      }),
+    ).toMatchObject({
+      url: "https://port.example/info",
+      clientAddress: "203.0.113.7",
+    });
+    // X-Forwarded-Proto counts only when an entry allows it for the host in use.
+    expect(
+      await info({
+        Host: "plain.example",
+        "X-Forwarded-Proto": "https",
+        ...forwardedFor,
+      }),
+    ).toMatchObject({
+      url: "http://plain.example/info",
+      clientAddress: "203.0.113.7",
+    });
+    // Without X-Forwarded-Proto, X-Forwarded-Host is matched with the server's protocol.
+    expect(
+      await info({ "X-Forwarded-Host": "app.example", ...forwardedFor }),
+    ).toMatchObject({
+      url: `http://localhost:${server.port}/info`,
+      clientAddress: "127.0.0.1",
+    });
   });
 
   test("trusts an allowed X-Forwarded-Host for the client address", async () => {

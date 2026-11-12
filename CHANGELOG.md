@@ -3,6 +3,7 @@
 ## 0.2.0
 
 - Requires Astro 7.4.11 or later.
+- `security.allowedDomains` matches `Host` and the forwarded headers as Astro 7.4.11 and its Node adapter do: each entry matches protocol, host, and port together. `X-Forwarded-Proto` counts only when an entry allows it for the host in use, `X-Forwarded-Host` without `X-Forwarded-Proto` is matched with the server's protocol, `port: "443"` matches an https host without a port, and a host that is not a plain `hostname[:port]` (percent-encoded, for one) moves the request to localhost.
 - A page that fails after it started streaming is logged once through the configured logger (withastro/astro#18625, fixed in Astro). The adapter needed no change; a test now covers it.
 
 ## 0.1.1

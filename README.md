@@ -65,7 +65,7 @@ export default defineConfig({
 });
 ```
 
-The proxy sends `Host` (or `X-Forwarded-Host`) and `X-Forwarded-Proto`. Without a match the request URL is `http://localhost:<port>`, and the client address is the socket's.
+The proxy sends `Host` (or `X-Forwarded-Host`) and `X-Forwarded-Proto`. Each entry matches protocol, host, and port together, as in Astro's Node adapter: with `protocol: "https"`, a request matches only when `X-Forwarded-Proto` is `https`. Without a match the request URL is `http://localhost:<port>`, and the client address is the socket's.
 
 ## In a container
 

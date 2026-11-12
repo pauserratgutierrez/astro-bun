@@ -5,7 +5,11 @@ export default defineConfig({
   output: "server",
   adapter: bun(),
   security: {
-    allowedDomains: [{ hostname: "app.example", protocol: "https" }],
+    allowedDomains: [
+      { hostname: "app.example", protocol: "https" },
+      { hostname: "port.example", protocol: "https", port: "443" },
+      { hostname: "plain.example", protocol: "http" },
+    ],
   },
   env: {
     schema: {

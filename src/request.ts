@@ -1,5 +1,5 @@
 import type { Server } from "bun";
-import { BaseApp } from "astro/app";
+import type { BaseApp } from "astro/app";
 
 type AllowedDomains = NonNullable<ReturnType<BaseApp["getAllowedDomains"]>>;
 
@@ -9,6 +9,7 @@ const CLIENT_ADDRESS = Symbol.for("astro.clientAddress");
 /**
  * The request Astro renders. Bun builds `request.url` from the Host header, which the client writes, so the URL is kept only when Host matches `security.allowedDomains`; otherwise it is `localhost` on the server's port, as in Astro's Node adapter. Astro applies X-Forwarded-Proto, -Host, and -Port itself.
  * The client's address is the first X-Forwarded-For entry when Host or X-Forwarded-Host matched, else the socket's.
+ * The rules are Astro's since 7.4.11 (`validateHost` and `validateForwardedHeaders`, which it does not export; `BaseApp.validateForwardedHost` keeps the older ones): X-Forwarded-Proto counts only when an entry allows it for the host in use, and an entry matches protocol, host, and port together.
  */
 export function forAstro(
   request: Request,
@@ -20,18 +21,24 @@ export function forAstro(
   let hostTrusted = false;
   let proxied = false;
   if (domains.length > 0) {
-    const protocol = forwardedProtocol(
-      first(headers.get("x-forwarded-proto")),
-      domains,
-    );
-    hostTrusted = allowed(
-      headers.get("host") ?? undefined,
-      protocol ?? scheme,
-      domains,
-    );
-    proxied =
-      hostTrusted ||
-      allowed(forwardedHost(headers, domains), protocol ?? "https", domains);
+    let proto = first(headers.get("x-forwarded-proto"));
+    if (proto !== undefined && !/^[a-z][a-z0-9+.-]*$/i.test(proto))
+      proto = undefined;
+    let port = first(headers.get("x-forwarded-port"));
+    if (port !== undefined && !/^\d{1,5}$/.test(port)) port = undefined;
+    const protocols = proto === undefined ? [scheme] : [proto, scheme];
+    const host = parseHost(headers.get("host"));
+    const forwardedHost = parseHost(first(headers.get("x-forwarded-host")));
+    // The protocol an entry allows for X-Forwarded-Host, else for Host: the host in use.
+    const forwarded =
+      forwardedHost && protocolFor(forwardedHost, protocols, port, domains);
+    const protocol =
+      forwarded ?? (host && protocolFor(host, protocols, port, domains));
+    // The protocol Host is validated with: X-Forwarded-Proto when an entry allowed it for the host in use, else the server's.
+    const hostProtocol =
+      proto !== undefined && protocol === proto ? proto : scheme;
+    hostTrusted = host !== undefined && admits(domains, hostProtocol, host);
+    proxied = hostTrusted || forwarded !== undefined;
   }
   const astroRequest = hostTrusted
     ? request
@@ -50,52 +57,79 @@ function first(value: string | null): string | undefined {
   return (comma === -1 ? value : value.slice(0, comma)).trim() || undefined;
 }
 
+interface Host {
+  hostname: string;
+  port: string | undefined;
+}
+
 /**
- * Whether Astro may build its URL from this host: a hostname and at most one port, matching an allowed domain for the protocol.
- * A host with `/`, `\`, or `@` is refused: for those Bun's `request.url` is a bare path, not a URL.
+ * A plain `hostname[:port]`, the only Host or X-Forwarded-Host Astro accepts, with the hostname a URL reads from it.
+ * Anything else is refused: with `/`, `\`, or `@`, Bun's `request.url` is a bare path, not a URL.
  */
-function allowed(
-  host: string | undefined,
-  protocol: string,
+function parseHost(value: string | null | undefined): Host | undefined {
+  if (!value || !/^[\w-]+(?:\.[\w-]+)*(?::\d{1,5})?$/.test(value))
+    return undefined;
+  const [name, port] = value.split(":") as [string, string?];
+  const hostname = URL.parse(`http://${value}`)?.hostname;
+  return hostname === name.toLowerCase() ? { hostname, port } : undefined;
+}
+
+/** The first protocol an entry allows for this host, with the forwarded port or without it. */
+function protocolFor(
+  host: Host,
+  protocols: string[],
+  port: string | undefined,
   domains: AllowedDomains,
-): boolean {
-  return (
-    host !== undefined &&
-    !/[/\\@]/.test(host) &&
-    host.split(":").length <= 2 &&
-    BaseApp.validateForwardedHost(host, domains, protocol)
+): string | undefined {
+  return protocols.find(
+    (protocol) =>
+      (port !== undefined && admits(domains, protocol, host, port)) ||
+      admits(domains, protocol, host),
   );
 }
 
-/** X-Forwarded-Proto when the allowed domains accept it: one of their protocols, or http and https when they name none. */
-function forwardedProtocol(
-  value: string | undefined,
+const DEFAULT_PORTS: Record<string, string> = { http: "80", https: "443" };
+
+/**
+ * Whether an entry allows this protocol, host, and port together. An entry without a protocol allows http and https.
+ * A forwarded port matches only an entry that lists it; otherwise an entry's port matches the host's, or the protocol's default.
+ */
+function admits(
   domains: AllowedDomains,
-): string | undefined {
-  if (value === undefined) return undefined;
-  const protocol = value.toLowerCase();
-  const named = domains.filter((domain) => domain.protocol !== undefined);
-  const ok =
-    named.length > 0
-      ? named.some((domain) => domain.protocol === protocol)
-      : protocol === "http" || protocol === "https";
-  return ok ? protocol : undefined;
+  protocol: string,
+  host: Host,
+  forwardedPort?: string,
+): boolean {
+  return domains.some(
+    (entry) =>
+      (entry.protocol === undefined
+        ? protocol === "http" || protocol === "https"
+        : entry.protocol === protocol.toLowerCase()) &&
+      hostnameMatches(host.hostname, entry.hostname) &&
+      (forwardedPort !== undefined
+        ? entry.port === forwardedPort
+        : entry.port === undefined ||
+          entry.port === (host.port ?? DEFAULT_PORTS[protocol.toLowerCase()])),
+  );
 }
 
-/** X-Forwarded-Host, with X-Forwarded-Port when an allowed domain names that port. */
-function forwardedHost(
-  headers: Headers,
-  domains: AllowedDomains,
-): string | undefined {
-  const host = first(headers.get("x-forwarded-host"));
-  const port = first(headers.get("x-forwarded-port"));
-  if (
-    host === undefined ||
-    port === undefined ||
-    !domains.some((domain) => domain.port === port)
-  )
-    return host;
-  return `${host.split(":", 1)[0]}:${port}`;
+/** An entry's hostname, where `*.` stands for one subdomain level and `**.` for any. */
+function hostnameMatches(
+  hostname: string,
+  pattern: string | undefined,
+): boolean {
+  if (!pattern) return true;
+  if (pattern.startsWith("**.")) {
+    const base = pattern.slice(2);
+    return hostname !== base && hostname.endsWith(base);
+  }
+  if (pattern.startsWith("*.")) {
+    const base = pattern.slice(1);
+    return (
+      hostname.endsWith(base) && !hostname.slice(0, -base.length).includes(".")
+    );
+  }
+  return pattern === hostname;
 }
 
 /** The path and query of `request.url` as Bun built it: a full URL, or a bare path when Host was unusable. */
