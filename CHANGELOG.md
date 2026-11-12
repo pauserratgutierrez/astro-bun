@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- `astro preview` fails, exiting 1, when its server cannot listen, for one because another server holds the port; it used to take that other server for its own and exit 0. The server now says when it listens, instead of the preview probing the port.
+
 ## 0.2.0
 
 - Requires Astro 7.4.11 or later.
