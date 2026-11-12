@@ -40,19 +40,19 @@ setAdapter({
 
 ### Runtime API
 
-| API                                                                                               | Use                                                                                                                                                                                                     |
-| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createApp({ streaming })` from `astro/app/entrypoint`                                            | The `App`, with the manifest and `src/fetch.ts` already wired.                                                                                                                                          |
-| `setGetEnv((key) => process.env[key])` from `astro/env/setup`                                     | Secrets for `astro:env/server`, before the first render.                                                                                                                                                |
-| `app.match(request, true)`                                                                        | The route, prerendered ones included. A prerendered page or endpoint is matched again with `app.match(request)`, so a lower-priority on-demand route can answer; a configured redirect keeps its match. |
-| `app.render(request, { addCookieHeader: true, routeData, prerenderedErrorPageFetch, waitUntil })` | The `Response`, which Bun sends as it is.                                                                                                                                                               |
-| `app.manifest` (`base`, `trailingSlash`, `buildFormat`, `assetsDir`, `allowedDomains`)            | Static file resolution.                                                                                                                                                                                 |
-| `app.getLogger()`, `app.adapterLogger`                                                            | Logs through the destination the app configured.                                                                                                                                                        |
+| API                                                                                                              | Use                                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createApp({ streaming })` from `astro/app/entrypoint`                                                           | The `App`, with the manifest and `src/fetch.ts` already wired.                                                                                                                                          |
+| `setGetEnv((key) => process.env[key])` from `astro/env/setup`                                                    | Secrets for `astro:env/server`, before the first render.                                                                                                                                                |
+| `app.match(request, true)`                                                                                       | The route, prerendered ones included. A prerendered page or endpoint is matched again with `app.match(request)`, so a lower-priority on-demand route can answer; a configured redirect keeps its match. |
+| `app.render(request, { addCookieHeader: true, clientAddress, routeData, prerenderedErrorPageFetch, waitUntil })` | The `Response`, which Bun sends as it is.                                                                                                                                                               |
+| `app.manifest` (`base`, `trailingSlash`, `buildFormat`, `assetsDir`, `allowedDomains`)                           | Static file resolution.                                                                                                                                                                                 |
+| `app.getLogger()`, `app.adapterLogger`                                                                           | Logs through the destination the app configured.                                                                                                                                                        |
 
 ### What Astro leaves to the adapter
 
 1. **The `Host` header.** Astro applies `X-Forwarded-Proto`, `-Host`, and `-Port` itself, and only with `security.allowedDomains`, but it never validates `Host`. Bun builds `request.url` from `Host`. A host outside `allowedDomains` makes the URL `http://localhost:<port>`, as `@astrojs/node` does since 11.1.7 (GHSA-m8p5-r7qv-cx4c). The match follows Astro's rules since 7.4.11 (withastro/astro#18641), the ones `createRequestFromNodeRequest` applies: `validateHost` and `validateForwardedHeaders`, which Astro does not export, are ported in `src/request.ts`. `BaseApp.validateForwardedHost`, the public one, keeps the older rules.
-2. **The client address.** The socket's, from `server.requestIP(request)`; the first `X-Forwarded-For` entry only when `Host` or `X-Forwarded-Host` validated. It is set on `request[Symbol.for("astro.clientAddress")]`, not passed as the `clientAddress` option, so Astro's own forwarded-header logic still applies.
+2. **The client address.** The socket's, from `server.requestIP(request)`; the first `X-Forwarded-For` entry only when `Host` or `X-Forwarded-Host` validated. It is passed as `app.render()`'s `clientAddress` option, whose default reads the same value from a symbol on the request.
 3. **Prerendered 404 and 500 pages,** through `prerenderedErrorPageFetch`. Without it Astro fetches them over HTTP from `http://localhost` with no port.
 4. **Static files and prerendered pages.**
 5. **The lifecycle:** startup, graceful shutdown, timeouts, body limit, errors.
@@ -108,9 +108,9 @@ fetch(request, server)
   host valid for allowedDomains (with the validated X-Forwarded-Proto)?
     yes: the request as it is, no new Request
     no:  new Request(`http://localhost:${port}${pathAndQuery}`, request)
-  request[Symbol.for("astro.clientAddress")] = forwarded client when the host validated, else server.requestIP(request)
+  clientAddress = forwarded client when the host validated, else server.requestIP(request)
   route = app.match(request, true); a prerendered page or endpoint is matched again with app.match(request)
-  response = await app.render(request, { addCookieHeader: true, routeData: route, prerenderedErrorPageFetch, waitUntil })
+  response = await app.render(request, { addCookieHeader: true, clientAddress, routeData: route, prerenderedErrorPageFetch, waitUntil })
   a text/event-stream response: server.timeout(request, 0)
   return response
 ```

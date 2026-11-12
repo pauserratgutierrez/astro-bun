@@ -77,7 +77,11 @@ export async function handler(
     const file = statics.find(query === -1 ? target : target.slice(0, query));
     if (file !== undefined) return file(request);
   }
-  const astroRequest = forAstro(request, server, domains);
+  const { request: astroRequest, clientAddress } = forAstro(
+    request,
+    server,
+    domains,
+  );
   try {
     let routeData = app.match(astroRequest, true);
     // A prerendered page or endpoint has its file; a lower-priority on-demand route may still answer this path. A configured redirect keeps its match.
@@ -88,6 +92,7 @@ export async function handler(
       routeData = app.match(astroRequest);
     const response = await app.render(astroRequest, {
       addCookieHeader: true,
+      clientAddress,
       routeData,
       prerenderedErrorPageFetch: prerenderedErrorPage,
       waitUntil,
