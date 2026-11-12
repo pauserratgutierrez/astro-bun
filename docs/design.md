@@ -121,7 +121,7 @@ An error is a plain-text 500, logged through `adapterLogger`; a client that alre
 
 ### Startup and shutdown
 
-- Startup: `setGetEnv`, `createApp`, load the static routes, preload every page module (`app.manifest.pageMap`, when present), `await app.getLogger()`, `Bun.serve`, then the listening line. A port in use is a clear error and exit code 1.
+- Startup: `setGetEnv`, `createApp`, `await app.getLogger()`, preload every page module (`app.manifest.pageMap`, when present), load the static routes, then, unless `ASTRO_BUN_AUTOSTART=disabled`, `Bun.serve` and the listening line. A port in use is a clear error and exit code 1.
 - Shutdown on `SIGTERM` or `SIGINT`: `await server.stop()`, which since Bun 1.4 closes idle keep-alive connections and waits for responses in flight; `server.stop(true)` after the deadline (8 s by default, under Docker's 10 s); then the pending `waitUntil` promises, also bounded; then the logger closes and the process exits 0. A second signal exits at once.
 
 ### Composition
@@ -213,7 +213,6 @@ The address comes from `HOST` and `PORT`, else Astro's `server.host` and `server
 
 ## Not yet
 
-- Publishing: the first release, from CI with provenance.
 - Measuring a real app on Bun against Node at the same CPU and memory limits: throughput, p95 latency, memory.
 - `staticHeaders`: the CSP header of prerendered pages (`astro:build:generated`'s `routeToHeaders`). Pages rendered on demand get theirs from Astro.
 - i18n domains: not declared, so Astro reports them unsupported.
