@@ -85,4 +85,41 @@ describe("astro preview", () => {
     }
     await until(async () => !(await answers()), 5000);
   }, 60_000);
+
+  test("fails, exiting 1, when another server holds the port", async () => {
+    const other = Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch: () => new Response("another server"),
+    });
+    try {
+      const cli = Bun.spawn(
+        [
+          "node",
+          astro,
+          "preview",
+          "--root",
+          root,
+          "--host",
+          "127.0.0.1",
+          "--port",
+          String(other.port),
+        ],
+        {
+          env: { ...process.env, ASTRO_TELEMETRY_DISABLED: "1" },
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      );
+      const [out, err, code] = await Promise.all([
+        new Response(cli.stdout).text(),
+        new Response(cli.stderr).text(),
+        cli.exited,
+      ]);
+      expect(code).toBe(1);
+      expect(out + err).toContain("before it listened");
+    } finally {
+      other.stop(true);
+    }
+  }, 60_000);
 });

@@ -128,7 +128,7 @@ An error is a plain-text 500, logged through `adapterLogger`; a client that alre
 
 ### Preview
 
-The Astro CLI imports `previewEntrypoint` in its own process, usually Node. The preview module runs `bun preview-child.js dist/server/entry.mjs` in the project's directory with `HOST` and `PORT` (Bun loads its `.env` files, as for local work), waits until a connection to that address opens, and returns `{ host, port, closed(), stop() }`. The CLI holds the child's stdin: when the CLI ends, however it ends (on Windows a kill runs no handler), the pipe closes and `preview-child.js` exits, so no server outlives it. A missing Bun is a clear error.
+The Astro CLI imports `previewEntrypoint` in its own process, usually Node. The preview module runs `bun preview-child.js dist/server/entry.mjs` in the project's directory with `HOST` and `PORT` (Bun loads its `.env` files, as for local work), and returns `{ host, port, closed(), stop() }` once the child writes a line on fd 3, a pipe the preview opens for it. The child writes it when the entry module has run, which is when `Bun.serve` listens; a server that cannot listen exits first, so `astro preview` fails with exit code 1 instead of reporting whatever else holds the port (tested). The CLI holds the child's stdin: when the CLI ends, however it ends (on Windows a kill runs no handler), the pipe closes and `preview-child.js` exits, so no server outlives it. A missing Bun is a clear error.
 
 ### Development
 
@@ -206,7 +206,7 @@ The address comes from `HOST` and `PORT`, else Astro's `server.host` and `server
   - `midstream`: a page failing after it started streaming ends unfinished and is logged once as a JSON `error` record; the server keeps answering.
   - `static`, `static-base`, `static-file`: encodings, 304 and HEAD on hashed files; names with `@`, accents, spaces, and `%`; `.well-known` and dotfiles; traversal attempts over raw TCP; POST to a static path; config redirects; `base` with `trailingSlash: "always"` from disk with Range; `build.format: "file"` with `trailingSlash: "never"`; a file another integration writes at build:done; a file copied in after the build.
   - `lifecycle`: event streams past the idle timeout, 413, client aborts, unhandled rejections, default sessions, preload, a port in use; on Linux and macOS, `SIGTERM` draining, `shutdownTimeout`, and a second signal.
-  - `compose`: an app's own `Bun.serve` with the static routes, Astro's handler, its own route, and a WebSocket; `astro preview` with the CLI on Node, and its server ending with the CLI.
+  - `compose`: an app's own `Bun.serve` with the static routes, Astro's handler, its own route, and a WebSocket; `astro preview` with the CLI on Node, its server ending with the CLI, and a preview whose port another server holds exiting 1.
 - `bun run test:linux` runs the suite on Linux from any OS; CI runs it on Ubuntu.
 
 ## Not yet

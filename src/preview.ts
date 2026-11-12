@@ -1,6 +1,5 @@
 // `astro preview` imports this module into the Astro CLI's process, on Node or Bun: node:* only. It runs the built server on Bun beside it.
 import { spawn } from "node:child_process";
-import { connect } from "node:net";
 import { fileURLToPath } from "node:url";
 import type { CreatePreviewServer } from "astro";
 
@@ -24,32 +23,18 @@ const createPreviewServer: CreatePreviewServer = async ({
     {
       cwd: fileURLToPath(root),
       env: { ...process.env, HOST: hostname, PORT: String(port) },
-      stdio: ["pipe", "inherit", "inherit"],
+      // The server ends when its stdin does, and says on fd 3 that it listens.
+      stdio: ["pipe", "inherit", "inherit", "pipe"],
     },
   );
   const closed = new Promise<void>((resolve) =>
     child.once("exit", () => resolve()),
   );
+  // The first of these settles it; the others then do nothing.
   await new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const settle = (error?: Error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (error === undefined) resolve();
-      else reject(error);
-    };
-    const timer = setTimeout(
-      () =>
-        settle(
-          new Error(
-            `The server did not listen on ${hostname}:${port} within ${STARTUP_TIMEOUT / 1000} s`,
-          ),
-        ),
-      STARTUP_TIMEOUT,
-    );
+    child.stdio[3]!.once("data", () => resolve());
     child.once("error", (error: NodeJS.ErrnoException) =>
-      settle(
+      reject(
         error.code === "ENOENT"
           ? new Error(
               "astro preview runs the built server on Bun, which is not installed or not on PATH: https://bun.com",
@@ -58,30 +43,19 @@ const createPreviewServer: CreatePreviewServer = async ({
       ),
     );
     child.once("exit", (code) =>
-      settle(
+      reject(
         new Error(`The server exited with code ${code} before it listened`),
       ),
     );
-    // Ready once a connection opens: the server's own startup line says so in whatever format the app logs.
-    const address =
-      hostname === "0.0.0.0"
-        ? "127.0.0.1"
-        : hostname === "::"
-          ? "::1"
-          : hostname;
-    const probe = () => {
-      if (settled) return;
-      const socket = connect(port, address);
-      socket.once("connect", () => {
-        socket.destroy();
-        settle();
-      });
-      socket.once("error", () => {
-        socket.destroy();
-        setTimeout(probe, 50);
-      });
-    };
-    probe();
+    setTimeout(
+      () =>
+        reject(
+          new Error(
+            `The server did not listen on ${hostname}:${port} within ${STARTUP_TIMEOUT / 1000} s`,
+          ),
+        ),
+      STARTUP_TIMEOUT,
+    ).unref();
   }).catch((error) => {
     child.kill();
     throw error;
