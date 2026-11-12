@@ -137,7 +137,7 @@ Astro has no official Bun adapter, and its team has said it does not plan Bun-sp
 
 ## Requirements
 
-- Astro 7.4 or later within 7.x.
+- Astro 7.4.11 or later within 7.x.
 - Bun 1.4.4 or later, to run the server.
 - The Node version Astro requires, for `astro dev` and `astro build`.
 

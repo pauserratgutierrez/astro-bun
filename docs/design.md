@@ -1,6 +1,6 @@
 # Design
 
-What the adapter must do for Astro 7 on Bun 1.4, and how. Checked against `astro` 7.4.5, `@astrojs/node` 11.1.9, `@types/bun` 1.4.4, and Bun's source at `bun-v1.4.4`. A line marked **unverified** comes from docs or source and still needs a test.
+What the adapter must do for Astro 7 on Bun 1.4, and how. Checked against `astro` 7.4.11, `@astrojs/node` 11.1.12, `@types/bun` 1.4.4, and Bun's source at `bun-v1.4.4`. A line marked **unverified** comes from docs or source and still needs a test.
 
 ## Two pieces
 

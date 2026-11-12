@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- Requires Astro 7.4.11 or later.
+
 ## 0.1.1
 
 The code of 0.1.0, published from CI through npm's trusted publishing, so the package now carries provenance. Releases follow a pushed version tag, which sets the version.

@@ -43,11 +43,11 @@
     "test:linux": "docker build -q -f test/Dockerfile -t astro-bun-test . && docker run --rm astro-bun-test"
   },
   "peerDependencies": {
-    "astro": "^7.4.0"
+    "astro": "^7.4.11"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",
-    "astro": "7.4.5",
+    "astro": "7.4.11",
     "typescript": "7.0.2"
   },
   "publishConfig": {
