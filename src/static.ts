@@ -124,7 +124,8 @@ interface Variant {
   size: number;
   etag: string;
   headers: Record<string, string>;
-  body(): Uint8Array | Blob;
+  /** The bytes in memory, or the file on disk. A Blob: `new Response()` shares it, but copies a Uint8Array each time. */
+  body: Blob;
 }
 
 async function prepare(
@@ -146,7 +147,9 @@ async function prepare(
   ];
   const variants = await Promise.all(
     sources.map(async ([encoding, path, size]): Promise<Variant> => {
-      const bytes = inMemory ? await Bun.file(path).bytes() : undefined;
+      const body = inMemory
+        ? new Blob([await Bun.file(path).bytes()])
+        : Bun.file(path);
       const etag = `"${file.hash}${encoding === undefined ? "" : `-${encoding}`}"`;
       const headers: Record<string, string> = {
         "Content-Type": type,
@@ -155,13 +158,7 @@ async function prepare(
       };
       if (sources.length > 1) headers.Vary = "Accept-Encoding";
       if (encoding !== undefined) headers["Content-Encoding"] = encoding;
-      return {
-        encoding,
-        size,
-        etag,
-        headers,
-        body: bytes === undefined ? () => Bun.file(path) : () => bytes,
-      };
+      return { encoding, size, etag, headers, body };
     }),
   );
   const identity = variants[0]!;
@@ -173,17 +170,17 @@ async function prepare(
     const tags = request.headers.get("if-none-match");
     if (tags !== null && etagMatches(tags, variant.etag))
       return new Response(null, { status: 304, headers: variant.headers });
-    return new Response(variant.body(), { headers: variant.headers });
+    return new Response(variant.body, { headers: variant.headers });
   };
   return {
     serve,
     // A file in memory with nothing to choose is a static response: Bun answers it, its 304, and HEAD without running JavaScript.
     route:
       variants.length === 1 && inMemory
-        ? new Response(identity.body(), { headers: identity.headers })
+        ? new Response(identity.body, { headers: identity.headers })
         : serve,
     plain: () =>
-      new Response(identity.body(), { headers: { "Content-Type": type } }),
+      new Response(identity.body, { headers: { "Content-Type": type } }),
   };
 }
 
@@ -216,8 +213,20 @@ export function choose<
   return best;
 }
 
-/** Whether an Accept-Encoding header takes an encoding: listed (or `*`) with a q-value above 0. */
+// A server sees few Accept-Encoding values, about one per browser: each is parsed once. The bound keeps a client that makes them up from growing it.
+const acceptances = new Map<string, (encoding: Encoding) => boolean>();
+
 function acceptance(header: string): (encoding: Encoding) => boolean {
+  let accepts = acceptances.get(header);
+  if (accepts === undefined) {
+    accepts = parseAcceptEncoding(header);
+    if (acceptances.size < 64) acceptances.set(header, accepts);
+  }
+  return accepts;
+}
+
+/** Whether an Accept-Encoding header takes an encoding: listed (or `*`) with a q-value above 0. */
+function parseAcceptEncoding(header: string): (encoding: Encoding) => boolean {
   const weights = new Map<string, number>();
   for (const part of header.toLowerCase().split(",")) {
     const [name = "", ...parameters] = part

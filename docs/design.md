@@ -93,13 +93,15 @@ At startup the server lists `dist/client` again: the files on disk are the ones 
 
 | File                                       | Served as                                                                  | Why                                                                                                           |
 | ------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| In memory, no compressed copy (png, woff2) | A static `{ GET: new Response(bytes, { headers }) }` route                 | Buffered once; Bun answers it, its 304 (our ETag), and HEAD with no JavaScript. Other methods go on to Astro. |
+| In memory, no compressed copy (png, woff2) | A static `{ GET: new Response(blob, { headers }) }` route                  | Buffered once; Bun answers it, its 304 (our ETag), and HEAD with no JavaScript. Other methods go on to Astro. |
 | In memory, with compressed copies          | A `{ GET: handler }` route that picks the smallest copy the client accepts | `Vary: Accept-Encoding`, one ETag per encoding, 304; HEAD from GET.                                           |
-| Over the memory budget                     | The same handler with `Bun.file(path)` bodies                              | Bun handles Range on the file itself and uses `sendfile` on Linux plain TCP for files of 1 MiB or more.       |
+| Over the memory budget                     | The same handler with `Bun.file(path)` bodies, each made once at startup   | Bun handles Range on the file itself and uses `sendfile` on Linux plain TCP for files of 1 MiB or more.       |
 | A redirect from `trailingSlash`            | A `{ GET: handler }` route                                                 |                                                                                                               |
 | Anything else                              | `fetch`, the fallback                                                      | First a lookup of the decoded path among the files, then Astro.                                               |
 
 Measured on Bun 1.4.4: a route key matches the request's raw path, so `/caf%C3%A9.txt` misses `/caf%c3%a9.txt` and `/logo@2x.png` misses `/logo%402x.png`. Keys are encoded as browsers send paths, and `fetch` looks up any other spelling, decoded, in a map of the files. A key with a segment that starts with `:` is a parameter that answers every path of its length, and `*` is a wildcard, so a file with such a name is answered from the map only. A static route answers every method, so a file is always a `{ GET }` route. No static request makes a filesystem call except for files over the budget, and only listed paths exist. Bun 1.4's `{ dir }` routes are not used: they cannot set response headers (no `immutable`), and their index and trailing-slash rules do not follow Astro's `trailingSlash`.
+
+A file in memory is a `Blob`: `new Response()` shares a Blob, but copies a `Uint8Array` on each call. Each `Accept-Encoding` value is parsed once, and up to 64 are kept. Measured in one process on Bun 1.4.4, against 0.2.0: a 100 KB file sent uncompressed went from 21 µs to 2 µs per request, its smallest compressed copy from 4.0 to 2.3 µs, and a 304 from 3.8 to 3.0 µs.
 
 ### Runtime: a request Astro renders
 
