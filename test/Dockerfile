@@ -2,7 +2,7 @@
 #   docker build -f test/Dockerfile -t astro-bun-test . && docker run --rm astro-bun-test
 FROM oven/bun:1.4.4-slim AS bun
 
-FROM node:26.13.0-bookworm-slim
+FROM node:26.13.1-bookworm-slim
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /work
 COPY package.json bun.lock ./

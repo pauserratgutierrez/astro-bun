@@ -3,7 +3,7 @@
 ## Toolchain
 
 - Bun 1.4.4: the install, the formatter (`bun fmt`), the typecheck, the tests, and the servers the tests start.
-- Node, in a version Astro supports (CI uses 26.13.0): the tests build each fixture with the Astro CLI on Node, as an app builds.
+- Node, in a version Astro supports (CI uses 26.13.1): the tests build each fixture with the Astro CLI on Node, as an app builds.
 - Docker, for the suite on Linux from another OS.
 
 ## Commands
@@ -43,7 +43,7 @@ npm lets a package trust a workflow only once the package exists, so 0.1.0 was p
 Each fix to Astro's Node adapter is a case that broke in production, and the adapter follows Astro's own rules where Astro does not export them. On each new version of `astro`, `@astrojs/node`, or Bun:
 
 1. Read the changelogs since the pinned versions: `astro`, [`@astrojs/node`](https://github.com/withastro/astro/blob/main/packages/integrations/node/CHANGELOG.md), Astro's [security advisories](https://github.com/withastro/astro/security/advisories), and Bun's release notes for `Bun.serve`, streams, and Node compatibility.
-2. Diff the published `dist/` of the old and new `astro` and `@astrojs/node` (`npm pack` each version): `core/app/` above all. `core/app/validate-headers.js` holds the rules `src/request.ts` ports; when they change, port them and compare `Astro.url` and `Astro.clientAddress` with `@astrojs/node` over raw requests with each combination of `Host` and `X-Forwarded-*`.
+2. Diff the published `dist/` of the old and new `astro` and `@astrojs/node` (`npm pack` each version): `core/app/` above all. `core/app/validate-headers.js` holds the rules `src/request.ts` ports; when they change, port them and compare `Astro.url` and `Astro.clientAddress` with `@astrojs/node` over raw requests with each combination of `Host` and `X-Forwarded-*`. Since 7.4.12 `astro` takes its `@astrojs/*` packages by `^` range, so an app can get a new `@astrojs/internal-helpers` without a new `astro`: diff it too, for `matchHostname` in `remote.js`, which `hostnameMatches` in `src/request.ts` ports.
 3. Pin the new version with `bun add -d -E`, run the suite here and on Linux, and update the versions [design.md](./design.md) says it is checked against. Raise the `astro` peer range when the adapter now relies on the new version, and say so in the changelog.
 
 ## Tests

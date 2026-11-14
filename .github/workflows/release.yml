@@ -27,11 +27,11 @@ jobs:
         with:
           persist-credentials: false
 
-      # Node 26.13.0 brings npm 11.20, past the 11.5.1 trusted publishing needs.
+      # Node 26.13.1 brings npm 11.20, past the 11.5.1 trusted publishing needs.
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 26.13.0
+          node-version: 26.13.1
           registry-url: https://registry.npmjs.org
           # A release never restores a cache another run could have written.
           package-manager-cache: false

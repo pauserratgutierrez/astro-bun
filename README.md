@@ -70,7 +70,7 @@ The proxy sends `Host` (or `X-Forwarded-Host`) and `X-Forwarded-Proto`. Each ent
 ## In a container
 
 ```dockerfile
-FROM node:26.13.0-bookworm-slim AS build
+FROM node:26.13.1-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
