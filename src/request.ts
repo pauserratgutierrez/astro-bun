@@ -6,7 +6,7 @@ type AllowedDomains = NonNullable<ReturnType<BaseApp["getAllowedDomains"]>>;
 /**
  * The request Astro renders, and the client's address for `app.render()`. Bun builds `request.url` from the Host header, which the client writes, so the URL is kept only when Host matches `security.allowedDomains`; otherwise it is `localhost` on the server's port, as in Astro's Node adapter. Astro applies X-Forwarded-Proto, -Host, and -Port itself.
  * The client's address is the first X-Forwarded-For entry when Host or X-Forwarded-Host matched, else the socket's.
- * The rules are Astro's since 7.4.11 (`validateHost` and `validateForwardedHeaders`, which it does not export; `BaseApp.validateForwardedHost` keeps the older ones): X-Forwarded-Proto counts only when an entry allows it for the host in use, and an entry matches protocol, host, and port together.
+ * The rules are Astro's since 7.4.11 (`validateHost` and `validateForwardedHeaders`, which it does not export; the public `BaseApp.validateForwardedHost` checks one host with them since 7.4.13, but cannot pick the protocol Host is matched with): X-Forwarded-Proto counts only when an entry allows it for the host in use, and an entry matches protocol, host, and port together.
  */
 export function forAstro(
   request: Request,
